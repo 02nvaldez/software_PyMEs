@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+
+{% block header_title %}Gestión de Lotes: {{ product.name }}{% endblock %}
+
+{% block content %}
+<div class="fade-in">
+    <div class="flex justify-between items-center mb-6">
+        <div>
+            <h2 class="text-xl font-semibold text-gray-800">Control de Lotes y Vencimientos</h2>
+            <p class="text-sm text-gray-500">Producto: <span class="font-bold text-primary-600">{{ product.name }}</span> | Stock Total: <span class="font-bold text-gray-800">{{ product.stock }}</span></p>
+        </div>
+        <a href="{{ url_for('inventory') }}" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg shadow-sm transition-colors flex items-center font-medium">
+            <i class="fa-solid fa-arrow-left mr-2"></i> Volver
+        </a>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <!-- Add Batch Form -->
+        <div class="lg:col-span-1">
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+                <h3 class="text-lg font-semibold text-gray-800 mb-4">Agregar Nuevo Lote</h3>
+                <form method="POST" class="space-y-4">
+                    <input type="hidden" name="action" value="add">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">N° de Lote / Identificador</label>
+                        <input type="text" name="batch_number" placeholder="Ej: LOT-2024-001" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Cantidad</label>
+                        <input type="number" step="0.01" name="quantity" required class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Fecha de Vencimiento</label>
+                        <input type="date" name="expiry_date" required class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 outline-none">
+                    </div>
+                    <button type="submit" class="w-full bg-primary-600 hover:bg-primary-700 text-white font-semibold py-2 rounded-lg shadow-md transition-colors flex items-center justify-center">
+                        <i class="fa-solid fa-plus mr-2"></i> Registrar Lote
+                    </button>
+                </form>
+                <div class="mt-6 p-4 bg-blue-50 rounded-xl border border-blue-100">
+                    <p class="text-xs text-blue-700 leading-relaxed">
+                        <i class="fa-solid fa-circle-info mr-1"></i> 
+                        El sistema descontará automáticamente de los lotes más próximos a vencer cuando realices una venta (Método FIFO).
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Batches Table -->
+        <div class="lg:col-span-2">
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-100 bg-gray-50/50">
+                    <h3 class="text-sm font-bold text-gray-500 uppercase tracking-wider">Lotes Activos</h3>
+                </div>
+                <!-- Table View (Hidden on mobile) -->
+                <div class="hidden md:block overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Lote</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Vencimiento</th>
+                                <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Estado</th>
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Cantidad</th>
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            {% for batch in batches %}
+                            <tr class="hover:bg-gray-50 transition-colors">
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                    {{ batch.batch_number or 'Sin N°' }}
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                                    {{ batch.expiry_date.strftime('%d-%m-%Y') }}
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-center">
+                                    {% set days_left = (batch.expiry_date - today).days %}
+                                    {% if days_left < 0 %}
+                                        <span class="px-2 py-1 text-xs font-bold bg-red-100 text-red-700 rounded-full">Vencido</span>
+                                    {% elif days_left <= product.expiry_alert_days %}
+                                        <span class="px-2 py-1 text-xs font-bold bg-orange-100 text-orange-700 rounded-full">Por Vencer</span>
+                                    {% else %}
+                                        <span class="px-2 py-1 text-xs font-bold bg-green-100 text-green-700 rounded-full">Al Día</span>
+                                    {% endif %}
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-bold text-gray-800">
+                                    {{ batch.quantity }}
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-right text-sm">
+                                    <form method="POST" class="inline">
+                                        <input type="hidden" name="action" value="delete">
+                                        <input type="hidden" name="batch_id" value="{{ batch.id }}">
+                                        <button type="button" onclick="confirmDeleteBatch(this.form, '{{ batch.batch_number or 'Sin N°' }}')" class="text-red-500 hover:text-red-700">
+                                            <i class="fa-solid fa-trash"></i>
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Mobile Card View (Hidden on desktop) -->
+                <div class="grid grid-cols-1 gap-4 md:hidden p-4">
+                    {% for batch in batches %}
+                    <div class="bg-gray-50 p-4 rounded-xl border border-gray-200 flex flex-col space-y-3">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <p class="text-[10px] text-gray-400 uppercase font-bold">Lote</p>
+                                <p class="text-sm font-bold text-gray-800">{{ batch.batch_number or 'Sin N°' }}</p>
+                            </div>
+                            <div class="text-right">
+                                {% set days_left = (batch.expiry_date - today).days %}
+                                {% if days_left < 0 %}
+                                    <span class="text-[10px] font-bold text-red-600 uppercase">Vencido</span>
+                                {% elif days_left <= product.expiry_alert_days %}
+                                    <span class="text-[10px] font-bold text-orange-600 uppercase">Por Vencer</span>
+                                {% else %}
+                                    <span class="text-[10px] font-bold text-green-600 uppercase">Al Día</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4 py-2 border-y border-gray-200">
+                            <div>
+                                <p class="text-[10px] text-gray-400 uppercase font-bold">Vencimiento</p>
+                                <p class="text-sm font-bold text-gray-900">{{ batch.expiry_date.strftime('%d-%m-%Y') }}</p>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-[10px] text-gray-400 uppercase font-bold">Cantidad</p>
+                                <p class="text-sm font-bold text-primary-600">{{ batch.quantity }}</p>
+                            </div>
+                        </div>
+                        <div class="flex justify-end">
+                            <form method="POST">
+                                <input type="hidden" name="action" value="delete">
+                                <input type="hidden" name="batch_id" value="{{ batch.id }}">
+                                <button type="button" onclick="confirmDeleteBatch(this.form, '{{ batch.batch_number or 'Sin N°' }}')" class="text-red-500 text-sm font-bold flex items-center">
+                                    <i class="fa-solid fa-trash mr-1"></i> Eliminar Lote
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="text-center text-gray-500 py-8">
+                        No hay lotes registrados.
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function confirmDeleteBatch(form, number) {
+        globalModal.show({
+            title: 'Eliminar Lote',
+            message: '¿Estás seguro de que deseas eliminar el lote <b>' + number + '</b>? El stock del producto se ajustará automáticamente.',
+            type: 'danger',
+            confirmText: 'Sí, Eliminar',
+            onConfirm: () => {
+                form.submit();
+            }
+        });
+    }
+</script>
+{% endblock %}

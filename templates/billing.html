@@ -1,0 +1,419 @@
+{% extends "base.html" %}
+
+{% block header_title %}Facturación y Cotizaciones{% endblock %}
+
+{% block content %}
+<div class="fade-in grid grid-cols-1 xl:grid-cols-3 gap-8" id="billing-app">
+    
+    <!-- Left Column (Client & Products) -->
+    <div class="xl:col-span-2 space-y-6">
+        
+        <!-- Client Section -->
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+            <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                <i class="fa-solid fa-user-tag text-primary-500 mr-2"></i> Datos del Cliente
+            </h3>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="relative">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Cédula / Documento *</label>
+                    <div class="flex">
+                        <input type="text" id="clientDoc" placeholder="Ej: 123456789" class="w-full border border-gray-300 rounded-l-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all">
+                        <button id="searchClientBtn" class="bg-gray-100 hover:bg-gray-200 border border-l-0 border-gray-300 rounded-r-lg px-4 text-gray-600 transition-colors">
+                            <i class="fa-solid fa-search"></i>
+                        </button>
+                    </div>
+                    <p id="clientStatusMsg" class="text-xs mt-1 text-gray-500"></p>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Nombre Completo *</label>
+                    <input type="text" id="clientName" placeholder="Consumidor Final" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Teléfono</label>
+                    <input type="tel" id="clientPhone" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Correo Electrónico</label>
+                    <input type="email" id="clientEmail" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all">
+                </div>
+                <div class="md:col-span-2">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Dirección</label>
+                    <input type="text" id="clientAddress" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all">
+                </div>
+            </div>
+        </div>
+
+        <!-- Products Section -->
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+            <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                <i class="fa-solid fa-box-open text-primary-500 mr-2"></i> Agregar Productos
+            </h3>
+            
+            <!-- Search Bar -->
+            <div class="relative mb-6">
+                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <i class="fa-solid fa-search text-gray-400"></i>
+                </div>
+                <input type="text" id="searchInput" placeholder="Escribe el nombre del producto..." class="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all">
+            </div>
+
+            <!-- Products Grid -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[350px] overflow-y-auto pr-2" id="productsGrid">
+                <div class="text-center py-8 text-gray-500 col-span-2" id="loadingProducts">
+                    <i class="fa-solid fa-spinner fa-spin text-2xl mb-2"></i>
+                    <p>Cargando productos...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Current Invoice (Right Panel) -->
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 flex flex-col xl:h-[calc(100vh-10rem)] xl:sticky xl:top-6">
+        <div class="flex justify-between items-center mb-6 pb-4 border-b border-gray-100">
+            <h3 class="text-lg font-semibold text-gray-800">Detalle de Factura</h3>
+            <span class="text-sm text-gray-500" id="currentDate"></span>
+        </div>
+
+        <!-- Selected Items -->
+        <div class="flex-1 overflow-y-auto mb-6 pr-2 space-y-3" id="invoiceItems">
+            <div class="text-center py-10 text-gray-400" id="emptyInvoiceMsg">
+                <i class="fa-solid fa-cart-shopping text-4xl mb-3 text-gray-200"></i>
+                <p>No hay productos en la factura</p>
+            </div>
+        </div>
+
+        <!-- Totals -->
+        <div class="bg-gray-50 rounded-xl p-4 space-y-3 mb-6 border border-gray-100">
+            <div class="flex justify-between text-gray-600 text-sm">
+                <span>Subtotal:</span>
+                <span id="subtotalAmount">$0.00</span>
+            </div>
+            <div class="flex justify-between items-center text-gray-600 text-sm">
+                <div class="flex items-center">
+                    <span>IVA/Impuesto:</span>
+                    <input type="number" step="any" id="taxRateInput" value="19" class="ml-2 w-16 px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:border-primary-500">
+                    <span class="ml-1">%</span>
+                </div>
+                <span id="taxAmount">$0.00</span>
+            </div>
+            <div class="pt-3 border-t border-gray-200 flex justify-between items-center">
+                <span class="text-gray-800 font-bold">Total:</span>
+                <span class="text-2xl font-bold text-primary-600" id="totalAmount">$0.00</span>
+            </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="grid grid-cols-1 gap-3 mt-auto">
+            <button id="processBtn" disabled class="w-full bg-primary-600 hover:bg-primary-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-medium py-3 rounded-xl shadow-md transition-all flex justify-center items-center">
+                <i class="fa-solid fa-check-circle mr-2"></i> Procesar Venta
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Success Modal -->
+<div id="successModal" class="fixed inset-0 bg-gray-900 bg-opacity-50 hidden z-50 flex items-center justify-center fade-in">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden text-center p-8">
+        <div class="w-20 h-20 bg-green-100 text-green-500 rounded-full flex items-center justify-center text-4xl mx-auto mb-4">
+            <i class="fa-solid fa-check"></i>
+        </div>
+        <h3 class="text-2xl font-bold text-gray-800 mb-2">¡Venta Exitosa!</h3>
+        <p class="text-gray-500 mb-8">La factura se ha procesado correctamente.</p>
+        
+        <div class="space-y-3">
+            <a href="#" id="printBtn" target="_blank" class="block w-full bg-gray-800 hover:bg-gray-900 text-white font-medium py-3 rounded-xl transition-all">
+                <i class="fa-solid fa-print mr-2"></i> Imprimir / PDF
+            </a>
+            <a href="#" id="whatsappBtn" target="_blank" class="block w-full bg-green-500 hover:bg-green-600 text-white font-medium py-3 rounded-xl transition-all">
+                <i class="fa-brands fa-whatsapp mr-2"></i> Enviar WhatsApp
+            </a>
+            <button onclick="resetBilling()" class="block w-full bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 font-medium py-3 rounded-xl transition-all mt-4">
+                Nueva Venta
+            </button>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let allProducts = [];
+    let invoiceItems = [];
+    
+    document.getElementById('currentDate').textContent = new Date().toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+    // Client Auto-complete
+    const docInput = document.getElementById('clientDoc');
+    const searchBtn = document.getElementById('searchClientBtn');
+    const statusMsg = document.getElementById('clientStatusMsg');
+    
+    function searchClient() {
+        const doc = docInput.value.trim();
+        if(!doc) return;
+        
+        statusMsg.textContent = 'Buscando...';
+        statusMsg.className = 'text-xs mt-1 text-blue-500';
+        
+        fetch('/api/client/' + doc)
+            .then(res => res.json())
+            .then(data => {
+                if(data.success) {
+                    document.getElementById('clientName').value = data.name || '';
+                    document.getElementById('clientPhone').value = data.phone || '';
+                    document.getElementById('clientEmail').value = data.email || '';
+                    document.getElementById('clientAddress').value = data.address || '';
+                    statusMsg.textContent = 'Cliente encontrado. Datos autocompletados.';
+                    statusMsg.className = 'text-xs mt-1 text-green-500';
+                } else {
+                    document.getElementById('clientName').value = '';
+                    document.getElementById('clientPhone').value = '';
+                    document.getElementById('clientEmail').value = '';
+                    document.getElementById('clientAddress').value = '';
+                    statusMsg.textContent = 'Cliente nuevo. Por favor llena los datos.';
+                    statusMsg.className = 'text-xs mt-1 text-yellow-500';
+                }
+            }).catch(() => {
+                statusMsg.textContent = 'Error buscando cliente.';
+                statusMsg.className = 'text-xs mt-1 text-red-500';
+            });
+    }
+
+    searchBtn.addEventListener('click', searchClient);
+    docInput.addEventListener('blur', searchClient);
+
+    // Load products
+    fetch('/api/products')
+        .then(response => response.json())
+        .then(data => {
+            allProducts = data;
+            document.getElementById('loadingProducts').style.display = 'none';
+            renderProductsGrid(allProducts);
+        });
+
+    document.getElementById('searchInput').addEventListener('input', function(e) {
+        const searchTerm = e.target.value.toLowerCase();
+        const filtered = allProducts.filter(p => p.name.toLowerCase().includes(searchTerm));
+        renderProductsGrid(filtered);
+    });
+    
+    document.getElementById('taxRateInput').addEventListener('input', updateTotals);
+
+    function renderProductsGrid(products) {
+        const grid = document.getElementById('productsGrid');
+        grid.innerHTML = '';
+        
+        if(products.length === 0) {
+            grid.innerHTML = '<div class="col-span-2 text-center py-8 text-gray-500">No se encontraron productos.</div>';
+            return;
+        }
+
+        products.forEach(p => {
+            const isOutOfStock = p.stock <= 0;
+            const div = document.createElement('div');
+            div.className = `bg-white border rounded-xl p-4 transition-all ${isOutOfStock ? 'opacity-60 border-red-200' : 'hover:border-primary-400 cursor-pointer hover:shadow-md'}`;
+            
+            if(!isOutOfStock) {
+                div.onclick = () => addToInvoice(p);
+            }
+
+            div.innerHTML = `
+                <div class="flex justify-between items-start mb-2">
+                    <h4 class="font-semibold text-gray-800 line-clamp-1">${p.name}</h4>
+                    <span class="font-bold text-primary-600">${formatCurrency(p.sale_price)}</span>
+                </div>
+                <div class="flex justify-between items-center text-xs">
+                    <span class="${p.stock < 5 ? 'text-red-500 font-semibold' : 'text-gray-500'}">
+                        Stock: ${p.stock}
+                    </span>
+                    ${isOutOfStock ? '<span class="bg-red-100 text-red-600 px-2 py-1 rounded">Agotado</span>' : '<span class="text-primary-500"><i class="fa-solid fa-plus-circle text-lg"></i></span>'}
+                </div>
+            `;
+            grid.appendChild(div);
+        });
+    }
+
+    function addToInvoice(product) {
+        const existingItem = invoiceItems.find(i => i.product.id === product.id);
+        
+        if(existingItem) {
+            if(existingItem.quantity < product.stock) {
+                existingItem.quantity++;
+            } else {
+                alert('No hay suficiente stock disponible.');
+                return;
+            }
+        } else {
+            invoiceItems.push({
+                product: product,
+                quantity: 1
+            });
+        }
+        
+        renderInvoiceItems();
+        updateTotals();
+    }
+
+    function removeFromInvoice(productId) {
+        invoiceItems = invoiceItems.filter(i => i.product.id !== productId);
+        renderInvoiceItems();
+        updateTotals();
+    }
+    
+    function changeQuantity(productId, delta) {
+        const item = invoiceItems.find(i => i.product.id === productId);
+        if(item) {
+            const newQty = item.quantity + delta;
+            if(newQty > 0 && newQty <= item.product.stock) {
+                item.quantity = newQty;
+                renderInvoiceItems();
+                updateTotals();
+            } else if (newQty > item.product.stock) {
+                alert('No hay suficiente stock.');
+            }
+        }
+    }
+
+    function renderInvoiceItems() {
+        const container = document.getElementById('invoiceItems');
+        const processBtn = document.getElementById('processBtn');
+        
+        if(invoiceItems.length === 0) {
+            container.innerHTML = `
+                <div class="text-center py-10 text-gray-400" id="emptyInvoiceMsg">
+                    <i class="fa-solid fa-cart-shopping text-4xl mb-3 text-gray-200"></i>
+                    <p>No hay productos en la factura</p>
+                </div>
+            `;
+            processBtn.disabled = true;
+            return;
+        }
+        
+        const content = invoiceItems.map(item => {
+            const subtotal = item.quantity * item.product.sale_price;
+            return `
+                <div class="flex justify-between items-center bg-white border border-gray-100 p-3 rounded-lg shadow-sm mb-2">
+                    <div class="flex-1 pr-2">
+                        <h5 class="font-medium text-gray-800 text-sm line-clamp-1">${item.product.name}</h5>
+                        <div class="text-xs text-gray-500">${formatCurrency(item.product.sale_price)} c/u</div>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <div class="flex items-center border border-gray-200 rounded px-1">
+                            <button onclick="changeQuantity(${item.product.id}, -1)" class="px-2 text-gray-500 hover:text-primary-600 font-bold">-</button>
+                            <span class="px-2 text-sm font-medium w-6 text-center">${item.quantity}</span>
+                            <button onclick="changeQuantity(${item.product.id}, 1)" class="px-2 text-gray-500 hover:text-primary-600 font-bold">+</button>
+                        </div>
+                        <div class="font-bold text-gray-800 text-sm w-16 text-right">${formatCurrency(subtotal)}</div>
+                        <button onclick="removeFromInvoice(${item.product.id})" class="text-red-400 hover:text-red-600 px-1"><i class="fa-solid fa-trash-can"></i></button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        container.innerHTML = content;
+        processBtn.disabled = false;
+    }
+
+    function formatCurrency(value) {
+        return '$' + Math.floor(value).toLocaleString('es-CO').replace(/,/g, '.');
+    }
+    
+    function updateTotals() {
+        const subtotal = invoiceItems.reduce((sum, item) => sum + (item.quantity * item.product.sale_price), 0);
+        const taxRate = parseFloat(document.getElementById('taxRateInput').value) || 0;
+        const taxAmount = subtotal * (taxRate / 100);
+        const total = subtotal + taxAmount;
+        
+        document.getElementById('subtotalAmount').textContent = formatCurrency(subtotal);
+        document.getElementById('taxAmount').textContent = formatCurrency(taxAmount);
+        document.getElementById('totalAmount').textContent = formatCurrency(total);
+    }
+
+    document.getElementById('processBtn').addEventListener('click', function() {
+        // Validate client data if doc is entered
+        const doc = document.getElementById('clientDoc').value.trim();
+        const name = document.getElementById('clientName').value.trim();
+        
+        if (doc && !name) {
+            alert('Si ingresas una cédula, debes ingresar el nombre del cliente.');
+            return;
+        }
+
+        this.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Procesando...';
+        this.disabled = true;
+        
+        const taxRate = parseFloat(document.getElementById('taxRateInput').value) || 0;
+        const payload = {
+            tax_rate: taxRate,
+            client: {
+                document_id: doc,
+                name: name,
+                phone: document.getElementById('clientPhone').value.trim(),
+                email: document.getElementById('clientEmail').value.trim(),
+                address: document.getElementById('clientAddress').value.trim()
+            },
+            items: invoiceItems.map(i => ({
+                product_id: i.product.id,
+                quantity: i.quantity
+            }))
+        };
+
+        fetch('/billing/process', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if(data.success) {
+                const modal = document.getElementById('successModal');
+                document.getElementById('printBtn').href = `/invoice/${data.invoice_id}/print`;
+                
+                const total = document.getElementById('totalAmount').textContent;
+                const msg = encodeURIComponent(`Hola! Aquí tienes el detalle de tu factura #${data.invoice_id} por un total de ${total}. Gracias por tu compra.`);
+                document.getElementById('whatsappBtn').href = `https://wa.me/${payload.client.phone}?text=${msg}`;
+                
+                modal.classList.remove('hidden');
+            } else {
+                alert('Error: ' + (data.error || 'Desconocido'));
+                this.innerHTML = '<i class="fa-solid fa-check-circle mr-2"></i> Procesar Venta';
+                this.disabled = false;
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            alert('Error de conexión');
+            this.innerHTML = '<i class="fa-solid fa-check-circle mr-2"></i> Procesar Venta';
+            this.disabled = false;
+        });
+    });
+
+    function resetBilling() {
+        invoiceItems = [];
+        document.getElementById('successModal').classList.add('hidden');
+        document.getElementById('processBtn').innerHTML = '<i class="fa-solid fa-check-circle mr-2"></i> Procesar Venta';
+        
+        // Reset client form
+        document.getElementById('clientDoc').value = '';
+        document.getElementById('clientName').value = '';
+        document.getElementById('clientPhone').value = '';
+        document.getElementById('clientEmail').value = '';
+        document.getElementById('clientAddress').value = '';
+        statusMsg.textContent = '';
+        
+        renderInvoiceItems();
+        updateTotals();
+        
+        // Reload products to get updated stock
+        fetch('/api/products')
+            .then(response => response.json())
+            .then(data => {
+                allProducts = data;
+                document.getElementById('searchInput').value = '';
+                renderProductsGrid(allProducts);
+            });
+    }
+
+</script>
+{% endblock %}

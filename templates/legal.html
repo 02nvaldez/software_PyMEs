@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Información Legal - MiNegocio</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'], },
+                    colors: { primary: { 50: '#eff6ff', 600: '#2563eb', 700: '#1d4ed8' } }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-gray-50 font-sans text-gray-800 antialiased">
+    
+    <!-- Header -->
+    <header class="bg-white border-b border-gray-200 py-6">
+        <div class="max-w-4xl mx-auto px-4 flex justify-between items-center">
+            <a href="{{ url_for('landing') }}" class="flex items-center text-primary-600 font-bold text-xl">
+                <i class="fa-solid fa-arrow-left mr-2 text-sm"></i> Volver al inicio
+            </a>
+            <div class="text-right">
+                <span class="font-bold text-2xl tracking-tight text-gray-900">Mi<span class="text-primary-600">Negocio</span></span>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-4xl mx-auto px-4 py-12">
+        <div class="bg-white shadow-sm border border-gray-200 rounded-2xl overflow-hidden">
+            
+            <!-- Navigation Tabs -->
+            <div class="flex border-b border-gray-200 bg-gray-50">
+                <button onclick="showSection('terms')" id="btn-terms" class="flex-1 py-4 px-6 text-sm font-semibold border-b-2 border-primary-600 text-primary-600 transition-all">Términos y Condiciones</button>
+                <button onclick="showSection('privacy')" id="btn-privacy" class="flex-1 py-4 px-6 text-sm font-medium text-gray-500 hover:text-gray-700 transition-all">Política de Privacidad (Habeas Data)</button>
+            </div>
+
+            <!-- Content Area -->
+            <div class="p-8 md:p-12 prose prose-blue max-w-none">
+                
+                <!-- Terms Section -->
+                <div id="section-terms" class="space-y-6">
+                    <h1 class="text-3xl font-bold text-gray-900 mb-8">Términos y Condiciones de Uso</h1>
+                    
+                    <section>
+                        <h2 class="text-xl font-bold text-gray-800 mb-3">1. Aceptación de los Términos</h2>
+                        <p class="text-gray-600 leading-relaxed">Al acceder y utilizar la plataforma MiNegocio, el usuario acepta de manera íntegra y sin reservas los presentes términos y condiciones. Si el usuario no está de acuerdo con alguna de las cláusulas, deberá abstenerse de utilizar el servicio.</p>
+                    </section>
+
+                    <section>
+                        <h2 class="text-xl font-bold text-gray-800 mb-3">2. Descripción del Servicio</h2>
+                        <p class="text-gray-600 leading-relaxed">MiNegocio es una solución de software como servicio (SaaS) diseñada para la gestión de inventarios, facturación POS, control de caja y agenda de citas para pequeñas y medianas empresas. El servicio se presta bajo la modalidad de suscripción mensual o anual.</p>
+                    </section>
+
+                    <section>
+                        <h2 class="text-xl font-bold text-gray-800 mb-3">3. Pagos y Renovaciones</h2>
+                        <ul class="list-disc pl-5 text-gray-600 space-y-2">
+                            <li>Los pagos se realizan mediante transferencia bancaria o métodos manuales autorizados.</li>
+                            <li>La suscripción otorga acceso por un periodo de 30 días calendario (plan mensual) o 365 días (plan anual).</li>
+                            <li>El incumplimiento en el pago resultará en la suspensión automática del acceso al sistema, permitiendo únicamente la exportación de datos.</li>
+                        </ul>
+                    </section>
+
+                    <section>
+                        <h2 class="text-xl font-bold text-gray-800 mb-3">4. Propiedad de la Información</h2>
+                        <p class="text-gray-600 leading-relaxed">Toda la información ingresada por el usuario (productos, ventas, datos de clientes) es propiedad exclusiva del usuario. MiNegocio se compromete a facilitar la exportación de estos datos en formatos estándar (CSV/Excel) en caso de terminación del servicio.</p>
+                    </section>
+
+                    <section>
+                        <h2 class="text-xl font-bold text-gray-800 mb-3">5. Limitación de Responsabilidad</h2>
+                        <p class="text-gray-600 leading-relaxed">MiNegocio no se hace responsable por errores en la contabilidad o facturación derivados del uso incorrecto del sistema por parte del usuario. Es responsabilidad del usuario verificar que su facturación cumpla con las normativas vigentes.</p>
+                    </section>
+                </div>
+
+                <!-- Privacy Section -->
+                <div id="section-privacy" class="hidden space-y-6">
+                    <h1 class="text-3xl font-bold text-gray-900 mb-8">Política de Tratamiento de Datos</h1>
+                    <p class="text-sm text-gray-500 mb-6 italic">En cumplimiento de la Ley 1581 de 2012 y el Decreto 1377 de 2013 de la República de Colombia.</p>
+
+                    <section>
+                        <h2 class="text-xl font-bold text-gray-800 mb-3">1. Recolección de Datos</h2>
+                        <p class="text-gray-600 leading-relaxed">Recolectamos datos personales necesarios para la prestación del servicio, incluyendo pero no limitado a: Nombres, NIT/Cédula, correo electrónico, teléfono y dirección del establecimiento.</p>
+                    </section>
+
+                    <section>
+                        <h2 class="text-xl font-bold text-gray-800 mb-3">2. Finalidad del Tratamiento</h2>
+                        <p class="text-gray-600 leading-relaxed">Los datos recolectados serán utilizados exclusivamente para:</p>
+                        <ul class="list-disc pl-5 text-gray-600 mt-2 space-y-2">
+                            <li>Proveer las funcionalidades del ERP (facturación, inventario).</li>
+                            <li>Gestionar el soporte técnico y atención al cliente.</li>
+                            <li>Enviar notificaciones sobre el estado de la suscripción y actualizaciones del sistema.</li>
+                        </ul>
+                    </section>
+
+                    <section>
+                        <h2 class="text-xl font-bold text-gray-800 mb-3">3. Seguridad de la Información</h2>
+                        <p class="text-gray-600 leading-relaxed">Implementamos medidas técnicas razonables para proteger la información, incluyendo la encriptación de contraseñas y el aislamiento de bases de datos por empresa (Multi-tenancy).</p>
+                    </section>
+
+                    <section>
+                        <h2 class="text-xl font-bold text-gray-800 mb-3">4. Derechos de los Titulares</h2>
+                        <p class="text-gray-600 leading-relaxed">Como titular de los datos, usted tiene derecho a conocer, actualizar, rectificar y suprimir su información personal en cualquier momento a través de nuestros canales de soporte.</p>
+                    </section>
+                </div>
+
+            </div>
+        </div>
+
+        <div class="mt-8 text-center text-gray-500 text-sm">
+            &copy; 2026 MiNegocio. Todos los derechos reservados. Colombia.
+        </div>
+    </main>
+
+    <script>
+        function showSection(section) {
+            const terms = document.getElementById('section-terms');
+            const privacy = document.getElementById('section-privacy');
+            const btnTerms = document.getElementById('btn-terms');
+            const btnPrivacy = document.getElementById('btn-privacy');
+
+            if (section === 'terms') {
+                terms.classList.remove('hidden');
+                privacy.classList.add('hidden');
+                btnTerms.classList.add('border-b-2', 'border-primary-600', 'text-primary-600');
+                btnPrivacy.classList.remove('border-b-2', 'border-primary-600', 'text-primary-600');
+                btnPrivacy.classList.add('text-gray-500');
+            } else {
+                privacy.classList.remove('hidden');
+                terms.classList.add('hidden');
+                btnPrivacy.classList.add('border-b-2', 'border-primary-600', 'text-primary-600');
+                btnTerms.classList.remove('border-b-2', 'border-primary-600', 'text-primary-600');
+                btnTerms.classList.add('text-gray-500');
+            }
+        }
+    </script>
+</body>
+</html>

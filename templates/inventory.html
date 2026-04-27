@@ -1,0 +1,422 @@
+{% extends "base.html" %}
+
+{% block header_title %}Inventario de Productos{% endblock %}
+
+{% block content %}
+<div class="fade-in">
+    
+    <!-- Header & Actions -->
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
+        <div class="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+            <h2 class="text-xl font-bold text-gray-800">Inventario</h2>
+            <form action="{{ url_for('inventory') }}" method="GET" class="flex items-center space-x-3">
+                <select name="sort" onchange="this.form.submit()" class="text-sm border border-gray-300 rounded-lg pl-3 pr-8 py-2 bg-gray-50 focus:ring-2 focus:ring-primary-500 outline-none">
+                    <option value="id_desc" {{ 'selected' if request.args.get('sort') == 'id_desc' }}>Más recientes</option>
+                    <option value="stock_asc" {{ 'selected' if request.args.get('sort') == 'stock_asc' }}>Menor stock</option>
+                    <option value="stock_desc" {{ 'selected' if request.args.get('sort') == 'stock_desc' }}>Mayor stock</option>
+                    <option value="price_asc" {{ 'selected' if request.args.get('sort') == 'price_asc' }}>Menor precio</option>
+                    <option value="price_desc" {{ 'selected' if request.args.get('sort') == 'price_desc' }}>Mayor precio</option>
+                    <option value="expiry_soon" {{ 'selected' if request.args.get('sort') == 'expiry_soon' }}>Próximos a vencer</option>
+                </select>
+                
+                <a href="{{ url_for('inventory', alert='true') if request.args.get('alert') != 'true' else url_for('inventory') }}" 
+                   class="text-sm px-4 py-2 rounded-lg border flex items-center transition-all {{ 'bg-red-600 text-white border-red-600 shadow-sm' if request.args.get('alert') == 'true' else 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50' }}">
+                    <i class="fa-solid fa-triangle-exclamation mr-2"></i> Ver Solo Alertas
+                </a>
+            </form>
+        </div>
+        <div class="flex space-x-3 w-full md:w-auto">
+            <a href="{{ url_for('export_inventory') }}" class="flex-1 md:flex-none justify-center bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg shadow-sm hover:bg-gray-50 transition-colors flex items-center">
+                <i class="fa-solid fa-file-excel mr-2 text-green-600"></i> Exportar
+            </a>
+            <button onclick="document.getElementById('addModal').classList.remove('hidden'); document.getElementById('addModal').classList.add('flex')" class="flex-1 md:flex-none justify-center bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg shadow-md transition-colors flex items-center">
+                <i class="fa-solid fa-plus mr-2"></i> Nuevo Producto
+            </button>
+        </div>
+    </div>
+
+    <!-- Table View (Hidden on mobile) -->
+    <div class="hidden md:block bg-white rounded-xl shadow-sm border border-gray-200 overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Producto</th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">P. Compra</th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">P. Venta</th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stock / Tipo</th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vencimiento</th>
+                    <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+                </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+                {% for product in products %}
+                <tr class="hover:bg-gray-50 transition-colors {{ 'bg-red-50 hover:bg-red-100' if product.stock <= product.min_stock and product.track_stock else '' }}">
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">#{{ product.id }}</td>
+                    <td class="px-6 py-4">
+                        <div class="text-sm font-medium text-gray-900">{{ product.name }}</div>
+                        <div class="text-sm text-gray-500 truncate max-w-xs">{{ product.description }}</div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ product.purchase_price|currency }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ product.sale_price|currency }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        {% if not product.track_stock %}
+                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-600">N/A</span>
+                        {% elif product.stock <= product.min_stock %}
+                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
+                                {{ product.stock }} (Bajo)
+                            </span>
+                        {% else %}
+                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                {{ product.stock }}
+                            </span>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm">
+                        {% if product.expiry_date %}
+                            {% set days_left = (product.expiry_date - today).days %}
+                            <span class="{{ 'text-red-600 font-bold' if days_left <= product.expiry_alert_days else 'text-gray-600' }}">
+                                {{ product.expiry_date.strftime('%d-%m-%Y') }}
+                                <br>
+                                <span class="text-[10px]">{{ days_left }} días rest.</span>
+                            </span>
+                        {% else %}
+                            <span class="text-gray-400">N/A</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <button onclick="openAdjustModal({{ product.id }}, '{{ product.name|replace("'", "\\'") }}', {{ product.stock }})" class="text-green-600 hover:text-green-900 mr-3" title="Ajustar Stock (+/-)">
+                            <i class="fa-solid fa-layer-group"></i>
+                        </button>
+                        <a href="{{ url_for('product_recipe', id=product.id) }}" class="text-purple-600 hover:text-purple-900 mr-3" title="Definir Receta / Combo / Insumos">
+                            <i class="fa-solid fa-flask"></i>
+                        </a>
+                        <a href="{{ url_for('product_batches', id=product.id) }}" class="text-orange-600 hover:text-orange-900 mr-3" title="Gestionar Lotes / Vencimientos Detallados">
+                            <i class="fa-solid fa-boxes-stacked"></i>
+                        </a>
+                        <button onclick="openEditModal({{ product.id }}, '{{ product.name|replace("'", "\\'") }}', '{{ product.description|replace("'", "\\'") }}', {{ product.purchase_price }}, {{ product.sale_price }}, {{ product.stock }}, {{ 'true' if product.track_stock else 'false' }}, {{ product.min_stock }}, '{{ product.expiry_date if product.expiry_date else "" }}', {{ product.expiry_alert_days or 30 }})" class="text-blue-600 hover:text-blue-900 mr-3" title="Editar Producto">
+                            <i class="fa-solid fa-pen-to-square"></i>
+                        </button>
+                        <form action="{{ url_for('delete_product', id=product.id) }}" method="POST" class="inline">
+                            <button type="button" onclick="confirmDelete(this.form, '{{ product.name }}')" class="text-red-600 hover:text-red-900" title="Eliminar">
+                                <i class="fa-solid fa-trash"></i>
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Mobile Card View (Hidden on desktop) -->
+    <div class="grid grid-cols-1 gap-4 md:hidden">
+        {% for product in products %}
+        <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200 flex flex-col space-y-3 {{ 'border-l-4 border-l-red-500 bg-red-50/30' if product.stock <= product.min_stock and product.track_stock else '' }}">
+            <div class="flex justify-between items-start">
+                <div>
+                    <span class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">ID: #{{ product.id }}</span>
+                    <h3 class="text-lg font-bold text-gray-800">{{ product.name }}</h3>
+                    <p class="text-sm text-gray-500 line-clamp-1">{{ product.description }}</p>
+                </div>
+                {% if product.track_stock %}
+                    <div class="text-right">
+                        <p class="text-xs text-gray-400 uppercase font-bold mb-1">Stock</p>
+                        <span class="px-3 py-1 rounded-full text-sm font-bold {{ 'bg-red-100 text-red-700' if product.stock <= product.min_stock else 'bg-green-100 text-green-700' }}">
+                            {{ product.stock }}
+                        </span>
+                    </div>
+                {% endif %}
+            </div>
+
+            <div class="grid grid-cols-2 gap-3 py-2 border-y border-gray-100">
+                <div>
+                    <p class="text-[10px] text-gray-400 uppercase font-bold">Precio Venta</p>
+                    <p class="text-base font-bold text-primary-600">{{ product.sale_price|currency }}</p>
+                </div>
+                <div>
+                    <p class="text-[10px] text-gray-400 uppercase font-bold">Vencimiento</p>
+                    {% if product.expiry_date %}
+                        {% set days_left = (product.expiry_date - today).days %}
+                        <p class="text-sm font-semibold {{ 'text-red-600' if days_left <= product.expiry_alert_days else 'text-gray-700' }}">
+                            {{ product.expiry_date.strftime('%d-%m-%Y') }}
+                            <span class="text-[10px] block">({{ days_left }} días)</span>
+                        </p>
+                    {% else %}
+                        <p class="text-sm text-gray-400">N/A</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="flex items-center justify-between pt-2">
+                <div class="flex space-x-4">
+                    <button onclick="openAdjustModal({{ product.id }}, '{{ product.name|replace("'", "\\'") }}', {{ product.stock }})" class="w-10 h-10 rounded-full bg-green-50 text-green-600 flex items-center justify-center border border-green-100" title="Ajustar Stock">
+                        <i class="fa-solid fa-layer-group"></i>
+                    </button>
+                    <a href="{{ url_for('product_recipe', id=product.id) }}" class="w-10 h-10 rounded-full bg-purple-50 text-purple-600 flex items-center justify-center border border-purple-100" title="Receta">
+                        <i class="fa-solid fa-flask"></i>
+                    </a>
+                    <a href="{{ url_for('product_batches', id=product.id) }}" class="w-10 h-10 rounded-full bg-orange-50 text-orange-600 flex items-center justify-center border border-orange-100" title="Lotes">
+                        <i class="fa-solid fa-boxes-stacked"></i>
+                    </a>
+                </div>
+                <div class="flex space-x-2">
+                    <button onclick="openEditModal({{ product.id }}, '{{ product.name|replace("'", "\\'") }}', '{{ product.description|replace("'", "\\'") }}', {{ product.purchase_price }}, {{ product.sale_price }}, {{ product.stock }}, {{ 'true' if product.track_stock else 'false' }}, {{ product.min_stock }}, '{{ product.expiry_date if product.expiry_date else "" }}', {{ product.expiry_alert_days or 30 }})" class="bg-gray-100 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium">
+                        <i class="fa-solid fa-pen mr-1"></i> Editar
+                    </button>
+                    <form action="{{ url_for('delete_product', id=product.id) }}" method="POST" class="inline" onsubmit="return confirm('¿Estás seguro?');">
+                        <button type="submit" class="bg-red-50 text-red-600 px-3 py-2 rounded-lg text-sm font-medium">
+                            <i class="fa-solid fa-trash"></i>
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <div class="bg-white p-8 rounded-xl border border-gray-200 text-center text-gray-500">
+            No hay productos registrados.
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Pagination -->
+    {% if pagination.pages > 1 %}
+    {% set args = request.args.to_dict() %}
+    {% set _ = args.pop('page', None) %}
+    <div class="mt-6 flex justify-between items-center">
+        <div class="text-sm text-gray-500">
+            Mostrando pág. <strong>{{ pagination.page }}</strong> de <strong>{{ pagination.pages }}</strong> ({{ pagination.total }} productos)
+        </div>
+        <div class="flex space-x-2">
+            {% if pagination.has_prev %}
+            <a href="{{ url_for('inventory', page=pagination.prev_num, **args) }}" class="px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+                <i class="fa-solid fa-chevron-left mr-1"></i> Anterior
+            </a>
+            {% endif %}
+            
+            {% if pagination.has_next %}
+            <a href="{{ url_for('inventory', page=pagination.next_num, **args) }}" class="px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+                Siguiente <i class="fa-solid fa-chevron-right ml-1"></i>
+            </a>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Add Modal -->
+<div id="addModal" class="fixed inset-0 bg-gray-900 bg-opacity-50 hidden z-50 flex items-center justify-center fade-in">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
+        <div class="bg-gray-50 px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+            <h3 class="text-lg font-semibold text-gray-800">Agregar Producto</h3>
+            <button onclick="document.getElementById('addModal').classList.add('hidden')" class="text-gray-400 hover:text-gray-600">
+                <i class="fa-solid fa-xmark text-xl"></i>
+            </button>
+        </div>
+        <form action="{{ url_for('add_product') }}" method="POST" class="p-6 space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Nombre</label>
+                <input type="text" name="name" required class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
+                <textarea name="description" rows="2" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all"></textarea>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Precio Compra</label>
+                    <input type="text" class="currency-mask w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all" data-real-input="real_purchase_price">
+                    <input type="hidden" name="purchase_price" id="real_purchase_price">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Precio Venta</label>
+                    <input type="text" class="currency-mask w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all" data-real-input="real_sale_price">
+                    <input type="hidden" name="sale_price" id="real_sale_price">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Stock Inicial</label>
+                        <input type="number" step="any" name="stock" value="0" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Mínimo para Alerta</label>
+                        <input type="number" step="any" name="min_stock" value="5" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all">
+                    </div>
+                </div>
+            </div>
+            <div class="flex items-center space-x-2 pt-2">
+                <input type="checkbox" name="track_stock" id="add_track_stock" checked class="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500">
+                <label for="add_track_stock" class="text-sm font-medium text-gray-700">Manejar Inventario (Desmarcar para Servicios)</label>
+            </div>
+
+            <div class="border-t border-gray-100 pt-4 mt-2">
+                <p class="text-xs font-bold text-gray-400 uppercase mb-3">Control de Vencimiento (Opcional)</p>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Fecha Vencimiento</label>
+                        <input type="date" name="expiry_date" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Alerta (Días antes)</label>
+                        <input type="number" name="expiry_alert_days" value="30" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all">
+                    </div>
+                </div>
+            </div>
+            <div class="pt-4 flex justify-end space-x-3">
+                <button type="button" onclick="document.getElementById('addModal').classList.add('hidden')" class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors">Cancelar</button>
+                <button type="submit" class="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors">Guardar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Edit Modal -->
+<div id="editModal" class="fixed inset-0 bg-gray-900 bg-opacity-50 hidden z-50 flex items-center justify-center fade-in">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
+        <div class="bg-gray-50 px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+            <h3 class="text-lg font-semibold text-gray-800">Editar Producto</h3>
+            <button onclick="document.getElementById('editModal').classList.add('hidden')" class="text-gray-400 hover:text-gray-600">
+                <i class="fa-solid fa-xmark text-xl"></i>
+            </button>
+        </div>
+        <form id="editForm" method="POST" class="p-6 space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Nombre</label>
+                <input type="text" id="edit_name" name="name" required class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
+                <textarea id="edit_description" name="description" rows="2" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all"></textarea>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Precio Compra</label>
+                    <input type="text" id="visual_edit_purchase_price" class="currency-mask w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all" data-real-input="edit_purchase_price">
+                    <input type="hidden" id="edit_purchase_price" name="purchase_price">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Precio Venta</label>
+                    <input type="text" id="visual_edit_sale_price" class="currency-mask w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all" data-real-input="edit_sale_price">
+                    <input type="hidden" id="edit_sale_price" name="sale_price">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Stock Actual</label>
+                        <input type="number" step="any" id="edit_stock" name="stock" required class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Mínimo para Alerta</label>
+                        <input type="number" step="any" id="edit_min_stock" name="min_stock" required class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all">
+                    </div>
+                </div>
+            </div>
+            <div class="flex items-center space-x-2 pt-2">
+                <input type="checkbox" name="track_stock" id="edit_track_stock" class="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500">
+                <label for="edit_track_stock" class="text-sm font-medium text-gray-700">Manejar Inventario</label>
+            </div>
+
+            <div class="border-t border-gray-100 pt-4 mt-2">
+                <p class="text-xs font-bold text-gray-400 uppercase mb-3">Control de Vencimiento (Opcional)</p>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Fecha Vencimiento</label>
+                        <input type="date" name="expiry_date" id="edit_expiry_date" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Alerta (Días antes)</label>
+                        <input type="number" name="expiry_alert_days" id="edit_expiry_alert_days" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all">
+                    </div>
+                </div>
+            </div>
+            <div class="pt-4 flex justify-end space-x-3">
+                <button type="button" onclick="document.getElementById('editModal').classList.add('hidden')" class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors">Cancelar</button>
+                <button type="submit" class="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors">Actualizar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Adjust Stock Modal -->
+<div id="adjustModal" class="fixed inset-0 bg-gray-900 bg-opacity-50 hidden z-50 flex items-center justify-center fade-in">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden">
+        <div class="bg-gray-50 px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+            <h3 class="text-lg font-semibold text-gray-800">Ajustar Stock Rápido</h3>
+            <button onclick="document.getElementById('adjustModal').classList.add('hidden')" class="text-gray-400 hover:text-gray-600">
+                <i class="fa-solid fa-xmark text-xl"></i>
+            </button>
+        </div>
+        <form id="adjustForm" method="POST" class="p-6 space-y-4">
+            <div>
+                <p class="text-sm font-medium text-gray-700 mb-1 text-center" id="adjustProductName">Producto XYZ</p>
+                <p class="text-xs text-gray-500 mb-4 text-center">Stock Actual: <span id="adjustCurrentStock" class="font-bold text-gray-800 text-lg">0</span></p>
+            </div>
+            
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Cantidad (+ o -)</label>
+                <div class="relative">
+                    <input type="number" step="any" name="quantity" required placeholder="Ej: 5 o -2" class="w-full pl-4 pr-10 border border-gray-300 rounded-lg py-2 focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none transition-all">
+                    <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-gray-400">
+                        <i class="fa-solid fa-box"></i>
+                    </div>
+                </div>
+                <p class="text-xs text-gray-500 mt-1">Usa números negativos para restar stock.</p>
+            </div>
+            
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Motivo / Razón</label>
+                <input type="text" name="reason" required placeholder="Ej: Mercancía nueva, Merma..." class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none transition-all">
+            </div>
+            
+            <div class="pt-4 flex justify-end space-x-3">
+                <button type="button" onclick="document.getElementById('adjustModal').classList.add('hidden')" class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors">Cancelar</button>
+                <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">Guardar Ajuste</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function openEditModal(id, name, desc, purchase, sale, stock, trackStock, minStock, expiryDate, expiryAlertDays) {
+        document.getElementById('editForm').action = "/inventory/edit/" + id;
+        document.getElementById('edit_name').value = name;
+        document.getElementById('edit_description').value = desc !== 'None' ? desc : '';
+        document.getElementById('edit_purchase_price').value = purchase;
+        document.getElementById('edit_sale_price').value = sale;
+        document.getElementById('edit_stock').value = stock;
+        document.getElementById('edit_min_stock').value = minStock;
+        
+        // Actualizar visual de máscara
+        document.getElementById('visual_edit_purchase_price').value = new Intl.NumberFormat('de-DE').format(purchase);
+        document.getElementById('visual_edit_sale_price').value = new Intl.NumberFormat('de-DE').format(sale);
+        document.getElementById('edit_track_stock').checked = trackStock;
+        
+        document.getElementById('edit_expiry_date').value = expiryDate;
+        document.getElementById('edit_expiry_alert_days').value = expiryAlertDays;
+
+        document.getElementById('editModal').classList.remove('hidden');
+        document.getElementById('editModal').classList.add('flex');
+    }
+
+    function openAdjustModal(id, name, current_stock) {
+        document.getElementById('adjustForm').action = "/inventory/adjust/" + id;
+        document.getElementById('adjustProductName').textContent = name;
+        document.getElementById('adjustCurrentStock').textContent = current_stock;
+        document.getElementById('adjustModal').classList.remove('hidden');
+    }
+
+    function confirmDelete(form, name) {
+        globalModal.show({
+            title: 'Eliminar Producto',
+            message: '¿Estás seguro de que deseas eliminar <b>' + name + '</b>? Esta acción es irreversible y afectará tu inventario.',
+            type: 'danger',
+            confirmText: 'Sí, Eliminar',
+            onConfirm: () => {
+                form.submit();
+            }
+        });
+    }
+</script>
+{% endblock %}

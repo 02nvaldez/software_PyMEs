@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SaaS Control - God Mode</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-gray-900 font-sans min-h-screen py-12 px-4 flex flex-col items-center">
+    
+    <div class="max-w-4xl w-full grid grid-cols-1 md:grid-cols-2 gap-8">
+        
+        <!-- Create Company Panel -->
+        <div class="bg-gray-800 rounded-xl shadow-2xl overflow-hidden border border-gray-700 h-fit">
+            <div class="p-6 border-b border-gray-700">
+                <h2 class="text-xl font-bold text-white flex items-center">
+                    <i class="fa-solid fa-plus-circle text-green-400 mr-3"></i> Crear Nueva Empresa
+                </h2>
+            </div>
+            <div class="p-6">
+                <form action="{{ url_for('system_admin') }}" method="POST" class="space-y-4">
+                    <input type="hidden" name="action" value="create_company">
+                    <div>
+                        <label class="text-xs text-gray-400 block mb-1">Correo del Dueño:</label>
+                        <input type="email" name="email" required placeholder="admin@ejemplo.com" class="w-full bg-gray-900 text-white border border-gray-700 rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="text-xs text-gray-400 block mb-1">Contraseña Temporal:</label>
+                        <input type="password" name="user_password" required placeholder="Clave inicial" class="w-full bg-gray-900 text-white border border-gray-700 rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-500 outline-none">
+                    </div>
+                    <div class="pt-4">
+                        <label class="text-xs text-gray-400 block mb-1">Tu Clave de Creador:</label>
+                        <input type="password" name="password" required placeholder="Contraseña Maestra" class="w-full bg-gray-900 text-white border border-gray-700 rounded-lg px-4 py-2 focus:ring-2 focus:ring-yellow-500 outline-none">
+                    </div>
+                    <button type="submit" class="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg font-bold transition-all mt-4">
+                        <i class="fa-solid fa-rocket mr-2"></i> Lanzar Instancia
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Manage Subscriptions Panel -->
+        <div class="bg-gray-800 rounded-xl shadow-2xl overflow-hidden border border-gray-700 h-fit">
+            <div class="p-6 border-b border-gray-700">
+                <h2 class="text-xl font-bold text-white flex items-center">
+                    <i class="fa-solid fa-credit-card text-yellow-400 mr-3"></i> Gestionar Suscripciones
+                </h2>
+            </div>
+            <div class="p-6">
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="rounded-md {{ 'bg-green-900 text-green-200 border-green-800' if category == 'success' else 'bg-red-900 text-red-200 border-red-800' }} border p-3 mb-4 text-sm">
+                                {{ message }}
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+
+                <form action="{{ url_for('system_admin') }}" method="POST" class="space-y-4">
+                    <div>
+                        <label class="text-xs text-gray-400 block mb-1">Seleccionar Empresa:</label>
+                        <select name="company_id" class="w-full bg-gray-900 text-white border border-gray-700 rounded-lg px-4 py-2 focus:ring-2 focus:ring-yellow-500 outline-none">
+                            <option value="">-- Elige una empresa --</option>
+                            {% for c in companies %}
+                            <option value="{{ c.id }}">{{ c.name }} ({{ 'Activa' if c.subscription_status == 'active' else 'SUSPENDIDA' }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 gap-3">
+                        <div>
+                            <label class="text-xs text-gray-400 block mb-1">Meses a sumar:</label>
+                            <input type="number" name="months" value="1" min="1" max="24" class="w-full bg-gray-900 text-white border border-gray-700 rounded-lg px-4 py-2 focus:ring-2 focus:ring-yellow-500 outline-none">
+                        </div>
+                    </div>
+
+                    <div class="pt-2">
+                        <label class="text-xs text-gray-400 block mb-1">Tu Clave de Creador:</label>
+                        <input type="password" name="password" required placeholder="Contraseña Maestra" class="w-full bg-gray-900 text-white border border-gray-700 rounded-lg px-4 py-2 focus:ring-2 focus:ring-yellow-500 outline-none">
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3 pt-4">
+                        <button type="submit" name="action" value="renew" class="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg font-medium transition-colors">
+                            <i class="fa-solid fa-calendar-plus mr-1"></i> Renovar
+                        </button>
+                        <button type="submit" name="action" value="suspend" class="bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-lg font-medium transition-colors">
+                            <i class="fa-solid fa-ban mr-1"></i> Suspender
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+    </div>
+
+    <div class="mt-12 text-center">
+        <a href="{{ url_for('dashboard') }}" class="text-gray-500 hover:text-white transition-colors flex items-center justify-center">
+            <i class="fa-solid fa-arrow-left mr-2"></i> Volver al Sistema
+        </a>
+    </div>
+    
+</body>
+</html>

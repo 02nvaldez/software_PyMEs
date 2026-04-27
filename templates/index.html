@@ -1,0 +1,233 @@
+{% extends "base.html" %}
+
+{% block header_title %}Resumen General{% endblock %}
+
+{% block content %}
+<div class="fade-in space-y-6">
+    <!-- Stats Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
+        
+        <!-- Total Products -->
+        <a href="{{ url_for('inventory') }}" class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-md transition-shadow relative overflow-hidden group">
+            <div class="absolute top-0 right-0 -mr-4 -mt-4 w-24 h-24 rounded-full bg-blue-50 opacity-50 group-hover:scale-110 transition-transform duration-500"></div>
+            <div class="flex items-center justify-between relative z-10">
+                <div>
+                    <p class="text-sm font-medium text-gray-500 mb-1">Total Productos</p>
+                    <h3 class="text-3xl font-bold text-gray-800">{{ total_products }}</h3>
+                </div>
+                <div class="w-12 h-12 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xl shadow-inner">
+                    <i class="fa-solid fa-box"></i>
+                </div>
+            </div>
+        </a>
+
+        <!-- Low Stock -->
+        <a href="{{ url_for('inventory', alert='true') }}" class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-md transition-shadow relative overflow-hidden group">
+            <div class="absolute top-0 right-0 -mr-4 -mt-4 w-24 h-24 rounded-full bg-red-50 opacity-50 group-hover:scale-110 transition-transform duration-500"></div>
+            <div class="flex items-center justify-between relative z-10">
+                <div>
+                    <p class="text-sm font-medium text-gray-500 mb-1">Alertas de Stock</p>
+                    <h3 class="text-3xl font-bold {{ 'text-red-600' if low_stock_products > 0 else 'text-gray-800' }}">{{ low_stock_products }}</h3>
+                </div>
+                <div class="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center text-xl shadow-inner">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                </div>
+            </div>
+        </a>
+
+        <!-- Expiry Alerts -->
+        <a href="{{ url_for('inventory', sort='expiry_soon') }}" class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-md transition-shadow relative overflow-hidden group">
+            <div class="absolute top-0 right-0 -mr-4 -mt-4 w-24 h-24 rounded-full bg-orange-50 opacity-50 group-hover:scale-110 transition-transform duration-500"></div>
+            <div class="flex items-center justify-between relative z-10">
+                <div>
+                    <p class="text-sm font-medium text-gray-500 mb-1">Por Vencer</p>
+                    <h3 class="text-3xl font-bold {{ 'text-orange-600' if expiring_soon_count > 0 else 'text-gray-800' }}">{{ expiring_soon_count }}</h3>
+                </div>
+                <div class="w-12 h-12 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center text-xl shadow-inner">
+                    <i class="fa-solid fa-calendar-times"></i>
+                </div>
+            </div>
+        </a>
+
+        <!-- Today's Appointments -->
+        <a href="{{ url_for('appointments', date_filter='today') }}" class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-md transition-shadow relative overflow-hidden group">
+            <div class="absolute top-0 right-0 -mr-4 -mt-4 w-24 h-24 rounded-full bg-green-50 opacity-50 group-hover:scale-110 transition-transform duration-500"></div>
+            <div class="flex items-center justify-between relative z-10">
+                <div>
+                    <p class="text-sm font-medium text-gray-500 mb-1">Citas Hoy</p>
+                    <h3 class="text-3xl font-bold text-gray-800">{{ appointments_today }}</h3>
+                </div>
+                <div class="w-12 h-12 rounded-full bg-green-100 text-green-600 flex items-center justify-center text-xl shadow-inner">
+                    <i class="fa-solid fa-clock"></i>
+                </div>
+            </div>
+        </a>
+
+        <!-- Total Appointments -->
+        <a href="{{ url_for('appointments') }}" class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-md transition-shadow relative overflow-hidden group">
+            <div class="absolute top-0 right-0 -mr-4 -mt-4 w-24 h-24 rounded-full bg-purple-50 opacity-50 group-hover:scale-110 transition-transform duration-500"></div>
+            <div class="flex items-center justify-between relative z-10">
+                <div>
+                    <p class="text-sm font-medium text-gray-500 mb-1">Citas Totales</p>
+                    <h3 class="text-3xl font-bold text-gray-800">{{ total_appointments }}</h3>
+                </div>
+                <div class="w-12 h-12 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center text-xl shadow-inner">
+                    <i class="fa-solid fa-calendar-days"></i>
+                </div>
+            </div>
+        </a>
+
+    </div>
+
+    <!-- Charts Section -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-8">
+        <!-- Sales Trend -->
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+            <h3 class="text-lg font-semibold text-gray-800 mb-4">Tendencia de Ventas (7 días)</h3>
+            <div class="h-64">
+                <canvas id="salesChart"></canvas>
+            </div>
+        </div>
+        
+        <!-- Top Products -->
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+            <h3 class="text-lg font-semibold text-gray-800 mb-4">Top Productos (Stock)</h3>
+            <div class="h-64">
+                <canvas id="topProductsChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Top Clients -->
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+            <h3 class="text-lg font-semibold text-gray-800 mb-4">Top Clientes (Ventas)</h3>
+            <div class="h-64">
+                <canvas id="topClientsChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="mt-8">
+        <h3 class="text-lg font-semibold text-gray-800 mb-4">Acciones Rápidas</h3>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <a href="{{ url_for('billing') }}" class="flex items-center p-4 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-xl shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-1">
+                <div class="bg-white/20 p-3 rounded-lg mr-4">
+                    <i class="fa-solid fa-cart-plus text-xl"></i>
+                </div>
+                <div>
+                    <h4 class="font-semibold">Nueva Venta</h4>
+                    <p class="text-sm text-primary-100">Crear factura o cotización</p>
+                </div>
+            </a>
+            
+            <a href="{{ url_for('inventory') }}" class="flex items-center p-4 bg-white border border-gray-200 text-gray-700 rounded-xl shadow-sm hover:border-primary-500 hover:text-primary-600 transition-all group">
+                <div class="bg-gray-100 text-gray-500 group-hover:bg-primary-50 group-hover:text-primary-500 p-3 rounded-lg mr-4 transition-colors">
+                    <i class="fa-solid fa-plus text-xl"></i>
+                </div>
+                <div>
+                    <h4 class="font-semibold">Agregar Producto</h4>
+                    <p class="text-sm text-gray-500">Actualizar inventario</p>
+                </div>
+            </a>
+
+            <a href="{{ url_for('appointments') }}" class="flex items-center p-4 bg-white border border-gray-200 text-gray-700 rounded-xl shadow-sm hover:border-purple-500 hover:text-purple-600 transition-all group">
+                <div class="bg-gray-100 text-gray-500 group-hover:bg-purple-50 group-hover:text-purple-500 p-3 rounded-lg mr-4 transition-colors">
+                    <i class="fa-solid fa-calendar-plus text-xl"></i>
+                </div>
+                <div>
+                    <h4 class="font-semibold">Agendar Cita</h4>
+                    <p class="text-sm text-gray-500">Nuevo cliente</p>
+                </div>
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    // Sales Chart
+    const ctxSales = document.getElementById('salesChart').getContext('2d');
+    new Chart(ctxSales, {
+        type: 'line',
+        data: {
+            labels: {{ chart_labels|tojson }},
+            datasets: [{
+                label: 'Ventas ($)',
+                data: {{ chart_values|tojson }},
+                borderColor: '#3b82f6',
+                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                fill: true,
+                tension: 0.4,
+                borderWidth: 3,
+                pointBackgroundColor: '#fff',
+                pointBorderColor: '#3b82f6',
+                pointHoverRadius: 6
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                y: { beginAtZero: true, grid: { display: false } },
+                x: { grid: { display: false } }
+            }
+        }
+    });
+
+    // Top Products Chart
+    const ctxTop = document.getElementById('topProductsChart').getContext('2d');
+    new Chart(ctxTop, {
+        type: 'bar',
+        data: {
+            labels: {{ top_labels|tojson }},
+            datasets: [{
+                label: 'Stock Actual',
+                data: {{ top_values|tojson }},
+                backgroundColor: [
+                    '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'
+                ],
+                borderRadius: 8
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                y: { beginAtZero: true, grid: { display: false } },
+                x: { grid: { display: false } }
+            }
+        }
+    });
+
+    // Top Clients Chart
+    const ctxClients = document.getElementById('topClientsChart').getContext('2d');
+    new Chart(ctxClients, {
+        type: 'doughnut',
+        data: {
+            labels: {{ client_labels|tojson }},
+            datasets: [{
+                data: {{ client_values|tojson }},
+                backgroundColor: [
+                    '#8b5cf6', '#ec4899', '#f97316', '#06b6d4', '#10b981'
+                ],
+                borderWidth: 0
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { 
+                legend: { 
+                    position: 'bottom',
+                    labels: { boxWidth: 12, padding: 15, font: { size: 10 } }
+                } 
+            },
+            cutout: '70%'
+        }
+    });
+</script>
+{% endblock %}
