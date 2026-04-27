@@ -5,6 +5,7 @@ from werkzeug.utils import secure_filename
 from models import db, Product, Appointment, Invoice, InvoiceItem, User, Client, CashRegister, InventoryMovement, Company, ProductComponent, ProductBatch
 from datetime import datetime, timedelta, timezone
 from functools import wraps
+from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 
 def get_now():
     # Fuerza la hora de Bogotá (UTC-5) independientemente del servidor
@@ -13,7 +14,12 @@ import os
 import io
 import csv
 import zipfile
+import smtplib
+import json
 from flask import send_file, make_response
+from email.message import EmailMessage
+from urllib.parse import urlencode
+from urllib.request import Request, urlopen
 from openpyxl import Workbook
 from openpyxl.styles import Font
 
@@ -24,6 +30,15 @@ basedir = os.path.abspath(os.path.dirname(__name__))
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'erp_system.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['UPLOAD_FOLDER'] = os.path.join(basedir, 'static', 'uploads')
+app.config['HCAPTCHA_SITE_KEY'] = os.getenv('HCAPTCHA_SITE_KEY', '')
+app.config['HCAPTCHA_SECRET_KEY'] = os.getenv('HCAPTCHA_SECRET_KEY', '')
+app.config['RESET_TOKEN_MAX_AGE_SECONDS'] = int(os.getenv('RESET_TOKEN_MAX_AGE_SECONDS', '1800'))
+app.config['MAIL_SERVER'] = os.getenv('MAIL_SERVER', 'smtp.gmail.com')
+app.config['MAIL_PORT'] = int(os.getenv('MAIL_PORT', '587'))
+app.config['MAIL_USERNAME'] = os.getenv('MAIL_USERNAME', '')
+app.config['MAIL_PASSWORD'] = os.getenv('MAIL_PASSWORD', '')
+app.config['MAIL_USE_TLS'] = os.getenv('MAIL_USE_TLS', 'true').lower() == 'true'
+app.config['MAIL_DEFAULT_SENDER'] = os.getenv('MAIL_DEFAULT_SENDER', app.config['MAIL_USERNAME'])
 
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
@@ -75,6 +90,65 @@ def permission_required(permission_name):
         return decorated_function
     return decorator
 
+def verify_hcaptcha(token, remoteip=None):
+    secret = app.config.get('HCAPTCHA_SECRET_KEY')
+    if not secret:
+        return True
+    if not token:
+        return False
+    payload = {
+        'secret': secret,
+        'response': token
+    }
+    if remoteip:
+        payload['remoteip'] = remoteip
+    req = Request(
+        'https://hcaptcha.com/siteverify',
+        data=urlencode(payload).encode('utf-8'),
+        headers={'Content-Type': 'application/x-www-form-urlencoded'}
+    )
+    try:
+        with urlopen(req, timeout=8) as response:
+            result = json.loads(response.read().decode('utf-8'))
+            return bool(result.get('success'))
+    except Exception:
+        return False
+
+def generate_reset_token(user_email):
+    serializer = URLSafeTimedSerializer(app.config['SECRET_KEY'])
+    return serializer.dumps(user_email, salt='password-reset-salt')
+
+def verify_reset_token(token):
+    serializer = URLSafeTimedSerializer(app.config['SECRET_KEY'])
+    return serializer.loads(
+        token,
+        salt='password-reset-salt',
+        max_age=app.config['RESET_TOKEN_MAX_AGE_SECONDS']
+    )
+
+def send_reset_email(user_email, reset_url):
+    username = app.config.get('MAIL_USERNAME')
+    password = app.config.get('MAIL_PASSWORD')
+    sender = app.config.get('MAIL_DEFAULT_SENDER')
+    if not username or not password or not sender:
+        return False
+
+    msg = EmailMessage()
+    msg['Subject'] = 'Restablecer contraseña - MiNegocio'
+    msg['From'] = sender
+    msg['To'] = user_email
+    msg.set_content(
+        f'Hola,\n\nRecibimos una solicitud para restablecer tu contraseña.\n'
+        f'Usa este enlace (válido por {app.config["RESET_TOKEN_MAX_AGE_SECONDS"] // 60} minutos):\n\n'
+        f'{reset_url}\n\nSi no fuiste tú, ignora este mensaje.'
+    )
+    with smtplib.SMTP(app.config['MAIL_SERVER'], app.config['MAIL_PORT']) as server:
+        if app.config['MAIL_USE_TLS']:
+            server.starttls()
+        server.login(username, password)
+        server.send_message(msg)
+    return True
+
 @app.before_request
 def check_security_and_subscription():
     if current_user.is_authenticated:
@@ -119,6 +193,11 @@ def login():
         return redirect(url_for('dashboard'))
         
     if request.method == 'POST':
+        captcha_token = request.form.get('h-captcha-response', '')
+        if not verify_hcaptcha(captcha_token, request.remote_addr):
+            flash('Verificación de seguridad inválida. Inténtalo de nuevo.', 'danger')
+            return render_template('login.html', hcaptcha_site_key=app.config.get('HCAPTCHA_SITE_KEY'))
+
         email = request.form.get('username') # HTML input name is still username
         password = request.form.get('password')
         user = User.query.filter_by(email=email).first()
@@ -137,7 +216,67 @@ def login():
         else:
             flash('Correo electrónico o contraseña incorrectos', 'danger')
             
-    return render_template('login.html')
+    return render_template('login.html', hcaptcha_site_key=app.config.get('HCAPTCHA_SITE_KEY'))
+
+@app.route('/forgot-password', methods=['GET', 'POST'])
+def forgot_password():
+    if current_user.is_authenticated:
+        return redirect(url_for('dashboard'))
+
+    if request.method == 'POST':
+        email = (request.form.get('email') or '').strip().lower()
+        user = User.query.filter_by(email=email).first()
+
+        if user:
+            try:
+                token = generate_reset_token(user.email)
+                reset_url = url_for('reset_password', token=token, _external=True)
+                if send_reset_email(user.email, reset_url):
+                    flash('Si el correo existe, enviamos instrucciones para restablecer la contraseña.', 'success')
+                else:
+                    flash('No se pudo enviar el correo en este momento. Revisa la configuración SMTP.', 'danger')
+            except Exception:
+                flash('No se pudo procesar la solicitud en este momento.', 'danger')
+        else:
+            flash('Si el correo existe, enviamos instrucciones para restablecer la contraseña.', 'success')
+
+        return redirect(url_for('forgot_password'))
+
+    return render_template('forgot_password.html')
+
+@app.route('/reset-password/<token>', methods=['GET', 'POST'])
+def reset_password(token):
+    if current_user.is_authenticated:
+        return redirect(url_for('dashboard'))
+    try:
+        email = verify_reset_token(token)
+    except SignatureExpired:
+        flash('El enlace de recuperación expiró. Solicita uno nuevo.', 'danger')
+        return redirect(url_for('forgot_password'))
+    except BadSignature:
+        flash('El enlace de recuperación es inválido.', 'danger')
+        return redirect(url_for('forgot_password'))
+
+    user = User.query.filter_by(email=email).first()
+    if not user:
+        flash('No se encontró una cuenta asociada a este enlace.', 'danger')
+        return redirect(url_for('forgot_password'))
+
+    if request.method == 'POST':
+        new_password = request.form.get('new_password')
+        confirm_password = request.form.get('confirm_password')
+        if not new_password or len(new_password) < 6:
+            flash('La contraseña debe tener al menos 6 caracteres.', 'danger')
+        elif new_password != confirm_password:
+            flash('Las contraseñas no coinciden.', 'danger')
+        else:
+            user.password_hash = generate_password_hash(new_password)
+            user.must_change_password = False
+            db.session.commit()
+            flash('Tu contraseña fue restablecida correctamente. Ya puedes iniciar sesión.', 'success')
+            return redirect(url_for('login'))
+
+    return render_template('reset_password.html', token=token)
 
 @app.route('/change_password', methods=['GET', 'POST'])
 @login_required
